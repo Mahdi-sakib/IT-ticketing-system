@@ -1,0 +1,112 @@
+{
+  "name": "ChangeRequest",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "normal",
+        "emergency"
+      ],
+      "default": "normal"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium"
+    },
+    "impact_analysis": {
+      "type": "string"
+    },
+    "implementation_plan": {
+      "type": "string"
+    },
+    "rollback_plan": {
+      "type": "string"
+    },
+    "testing_plan": {
+      "type": "string"
+    },
+    "scheduled_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "in_progress",
+        "implemented",
+        "failed",
+        "closed"
+      ],
+      "default": "draft"
+    },
+    "requested_by_name": {
+      "type": "string"
+    },
+    "owner_name": {
+      "type": "string"
+    },
+    "cab_required": {
+      "type": "boolean",
+      "description": "Change Advisory Board approval required",
+      "default": true
+    },
+    "approver_name": {
+      "type": "string"
+    },
+    "approval_notes": {
+      "type": "string"
+    },
+    "affected_ci_ids": {
+      "type": "string",
+      "description": "Comma-separated ConfigurationItem ids"
+    },
+    "category": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "type",
+    "status"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "agent"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
