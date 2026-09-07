@@ -1,84 +1,89 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { Users } from "@/api/entities";
+import { Users, absorb } from "@/api/entities";
+import { getToken, setToken } from "@/api/authToken";
 import { ROLES } from "@/lib/ticketConstants";
 
-const SESSION_KEY = "omnidesk_it_session";
+const PREVIEW_KEY = "omnidesk_it_preview_role";
 const AuthCtx = createContext(null);
 
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
+
+async function authRequest(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Request failed.");
+  return data;
 }
 
 export function AuthProvider({ children }) {
-  const [userId, setUserId] = useState(() => loadSession()?.userId ?? null);
-  const [previewRole, setPreviewRole] = useState(() => loadSession()?.previewRole ?? null);
+  const [previewRole, setPreviewRole] = useState(() => {
+    try {
+      return localStorage.getItem(PREVIEW_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(() => {
-    if (!userId) {
-      setUser(null);
+    setUser((current) => (current ? Users.get(current.id) || current : current));
+  }, []);
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
       setLoading(false);
       return;
     }
-    const found = Users.get(userId);
-    setUser(found);
-    setLoading(false);
-  }, [userId]);
+    fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Session expired"))))
+      .then(({ user: found }) => setUser(found))
+      .catch(() => setToken(null))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    try {
+      if (previewRole) localStorage.setItem(PREVIEW_KEY, previewRole);
+      else localStorage.removeItem(PREVIEW_KEY);
+    } catch {
+      // ignore
+    }
+  }, [previewRole]);
 
-  useEffect(() => {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ userId, previewRole }));
-  }, [userId, previewRole]);
-
-  const login = useCallback((email, password) => {
-    const found = Users.filter({ email }).find((u) => u.password === password);
-    if (!found) throw new Error("Invalid email or password.");
-    if (found.disabled) throw new Error("This account has been disabled. Contact your IT administrator.");
-    setUserId(found.id);
-    // Also set `user` synchronously (not just `userId`) so `isAuthenticated`
-    // is already true on the very next render — otherwise a caller that
-    // navigates right after login() would hit ProtectedRoute before the
-    // userId->refresh() effect has had a chance to run, bouncing back to
-    // the login page.
+  const login = useCallback(async (email, password) => {
+    const { token, user: found } = await authRequest("/auth/login", { email, password });
+    setToken(token);
     setUser(found);
     return found;
   }, []);
 
-  const register = useCallback((fields) => {
-    const exists = Users.filter({ email: fields.email }).length > 0;
-    if (exists) throw new Error("An account with this email already exists.");
-    const created = Users.create({
-      role: ROLES.EMPLOYEE,
-      disabled: false,
-      employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-      ...fields,
-    });
-    setUserId(created.id);
+  const register = useCallback(async (fields) => {
+    const { token, user: created } = await authRequest("/auth/register", fields);
+    absorb("users", created);
+    setToken(token);
     setUser(created);
     return created;
   }, []);
 
   const logout = useCallback(() => {
-    setUserId(null);
+    setToken(null);
+    setUser(null);
     setPreviewRole(null);
   }, []);
 
   const updateProfile = useCallback(
     (fields) => {
-      if (!userId) return;
-      Users.update(userId, fields);
+      if (!user) return;
+      Users.update(user.id, fields);
       refresh();
     },
-    [userId, refresh]
+    [user, refresh]
   );
 
   const effectiveRole = previewRole || user?.role || ROLES.EMPLOYEE;

@@ -26,12 +26,12 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      login(email.trim().toLowerCase(), password);
+      await login(email.trim().toLowerCase(), password);
       toast.success("Welcome back!");
       navigate(safeReturnTo() || "/dashboard", { replace: true });
     } catch (err) {
@@ -41,13 +41,13 @@ export default function Login() {
     }
   }
 
-  function quickLogin(demoEmail) {
+  async function quickLogin(demoEmail) {
     try {
-      login(demoEmail, "demo1234");
+      await login(demoEmail, "demo1234");
       toast.success("Signed in with demo account");
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      toast.error("Demo accounts aren't seeded yet — refresh the app once to seed data.");
+      toast.error(err.message || "Could not sign in with the demo account.");
     }
   }
 

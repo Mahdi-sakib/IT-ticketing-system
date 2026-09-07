@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Every OmniDesk IT entity (users, tickets, assets, ...) is stored here as
+// one row per document, keyed by `collection` — the same "flexible document
+// per collection" shape the app already used in the browser (see the old
+// src/api/db.js). This keeps the whole data model in one small, generic
+// table instead of 16 rigid ones, and matches exactly what the frontend
+// cache expects back on GET /api/bootstrap.
+model Item {
+  id         String   @id
+  collection String
+  data       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([collection])
+}

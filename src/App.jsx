@@ -1,14 +1,14 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
-import { AuthProvider } from "@/lib/AuthContext";
+import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Layout from "@/components/Layout";
 import ScrollToTop from "@/components/ScrollToTop";
 import PageNotFound from "@/lib/PageNotFound";
+import Loading from "@/components/Loading";
 import { ROLES } from "@/lib/ticketConstants";
-import { isSeeded, markSeeded } from "@/api/db";
-import { seedDatabase } from "@/lib/seedData";
+import { bootstrap } from "@/api/db";
 import { processSlaEscalations } from "@/lib/ai";
 
 import Login from "@/pages/Login";
@@ -44,20 +44,56 @@ function Protected({ roles, children }) {
   );
 }
 
-export default function App() {
+// SLA escalation writes to the server, so it can only run once someone is
+// actually signed in (an anonymous visitor on /login has no auth token).
+function SlaEscalationRunner() {
+  const { isAuthenticated } = useAuth();
+
   useEffect(() => {
-    if (!isSeeded()) {
-      seedDatabase();
-      markSeeded();
-    }
+    if (!isAuthenticated) return;
     processSlaEscalations();
     const interval = setInterval(processSlaEscalations, 60000);
     return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  return null;
+}
+
+export default function App() {
+  const [ready, setReady] = useState(false);
+  const [bootError, setBootError] = useState(null);
+
+  useEffect(() => {
+    bootstrap()
+      .then(() => setReady(true))
+      .catch((err) => setBootError(err));
   }, []);
+
+  if (bootError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center">
+        <div>
+          <p className="mb-2 text-lg font-semibold">Can't reach the OmniDesk IT server</p>
+          <p className="text-sm text-muted-foreground">
+            Make sure the backend is running (npm run dev inside /server), then reload this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loading label="Loading OmniDesk IT..." />
+      </div>
+    );
+  }
 
   return (
     <AuthProvider>
       <ScrollToTop />
+      <SlaEscalationRunner />
       <Toaster position="top-right" richColors closeButton />
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

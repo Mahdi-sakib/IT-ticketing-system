@@ -28,12 +28,12 @@ export default function Register() {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      register({ ...form, email: form.email.trim().toLowerCase() });
+      await register({ ...form, email: form.email.trim().toLowerCase() });
       toast.success("Account created — welcome to OmniDesk IT!");
       navigate("/dashboard", { replace: true });
     } catch (err) {

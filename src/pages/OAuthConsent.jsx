@@ -6,36 +6,31 @@ import GoogleIcon from "@/components/GoogleIcon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/AuthContext";
-import { Users } from "@/api/entities";
-import { ROLES } from "@/lib/ticketConstants";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 const DEMO_GOOGLE_EMAIL = "demo.google.user@omnidesk.dev";
+const DEMO_GOOGLE_PASSWORD = "google-oauth";
 
 export default function OAuthConsent() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  function allow() {
+  async function allow() {
     setLoading(true);
     try {
-      const existing = Users.filter({ email: DEMO_GOOGLE_EMAIL })[0];
-      if (existing) {
-        login(DEMO_GOOGLE_EMAIL, existing.password);
-      } else {
-        const created = Users.create({
+      try {
+        await login(DEMO_GOOGLE_EMAIL, DEMO_GOOGLE_PASSWORD);
+      } catch {
+        // First time this demo account is used — register it, then it
+        // behaves like any other account on subsequent sign-ins.
+        await register({
           full_name: "Demo Google User",
           email: DEMO_GOOGLE_EMAIL,
-          password: "google-oauth",
-          role: ROLES.EMPLOYEE,
+          password: DEMO_GOOGLE_PASSWORD,
           department: "Operations",
           location: "Head Office - Dhaka",
-          disabled: false,
-          employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-          auth_provider: "google",
         });
-        login(created.email, created.password);
       }
       toast.success("Signed in with Google (demo)");
       navigate(safeReturnTo() || "/dashboard", { replace: true });

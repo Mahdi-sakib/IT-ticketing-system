@@ -1,7 +1,8 @@
-import { makeCollection } from "./db";
+import { makeCollection, absorb } from "./db";
 
-// One collection per Base44 entity (see base44/entities/*.jsonc for the
-// original field-level schemas this app was generated from).
+export { absorb };
+
+// One collection per OmniDesk IT entity.
 export const Users = makeCollection("users");
 export const Tickets = makeCollection("tickets");
 export const TicketComments = makeCollection("ticket_comments");

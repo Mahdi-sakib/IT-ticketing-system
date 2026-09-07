@@ -4,37 +4,18 @@ OmniDesk IT is a full-featured IT ticketing / ITSM platform: ticket
 management, SLA + escalation tracking, asset & configuration management,
 problem & change management, major incident coordination, a knowledge base,
 a self-service catalog, an AI-assisted helpdesk chatbot, a no-code automation
-engine, and executive analytics — all running as a single, self-contained
-React application.
+engine, and executive analytics — a React frontend backed by a real Node.js
+API and database.
 
-## A note on how this repository came to be
+## Feature set
 
-This app's requirements were originally built and prototyped in
-[Base44](https://base44.app) (a no-code AI app builder) under the project
-name "steady-omni-desk-flow". Base44's Free plan does not allow exporting a
-project as source code or connecting it to GitHub (`Export as ZIP` and
-`GitHub sync` are both paid-plan features), so a literal file-for-file copy
-wasn't possible.
-
-Instead, this codebase is a **from-scratch, functionally complete rebuild**
-implementing the exact same specification — the full base ITSM feature set
-plus all 30 advanced enterprise features originally requested (AI
-classification & routing, SLA/escalation engine, Major Incident Management,
-Problem Management, Change Management, CMDB, Service Catalog, a no-code
-Automation Engine, Asset Lifecycle tracking, an AI helpdesk chatbot,
-real-time notifications, CSAT, an advanced knowledge base, executive
-analytics with AI-generated insights, a full audit trail, role-based
-security, multi-department/location support, and more).
-
-A handful of entity schemas were captured directly from the original Base44
-project's read-only code viewer and are kept as reference documentation
-under [`base44/entities/`](./base44/entities) (`Asset.jsonc`,
-`AutomationRule.jsonc`, `ChangeRequest.jsonc`, `ConfigurationItem.jsonc`,
-`CsatResponse.jsonc`) — these were used as the authoritative source for the
-matching data models in this rebuild. The rest of the app's ~90 files were
-written new, following the same architecture conventions (role-based access,
-`display_id`/`created_date` style fields, etc.) inferred from those schemas
-and the full product specification.
+OmniDesk IT implements a full base ITSM feature set plus a wide range of
+advanced enterprise features: AI classification & routing, an SLA/escalation
+engine, Major Incident Management, Problem Management, Change Management,
+CMDB, a Service Catalog, a no-code Automation Engine, Asset Lifecycle
+tracking, an AI helpdesk chatbot, real-time notifications, CSAT, an advanced
+knowledge base, executive analytics with AI-generated insights, a full audit
+trail, role-based security, and multi-department/location support.
 
 ## Tech stack
 
@@ -47,22 +28,36 @@ and the full product specification.
 - **sonner** — toast notifications
 - **date-fns**, **lucide-react**, **uuid**, **clsx** / **tailwind-merge**
 
-There is **no external backend** — the app uses `localStorage` as a mock
-document database (see `src/api/db.js`), so it runs completely standalone
-with zero configuration. This makes it trivial to demo, but also means data
-is per-browser; see "Swapping in a real backend" below for how to connect it
-to a real API.
+The frontend talks to a real backend — **Node.js + Express + Prisma +
+SQLite** (see [`server/`](./server)) — for persistence, authentication, and
+every read/write in the app. Passwords are hashed with bcrypt and sessions
+use JWTs; nothing sensitive is ever kept in `localStorage`. See
+[Architecture](#architecture) below for how the two halves fit together.
 
 ## Getting started
 
+One-time setup (installs both the frontend and backend, and creates the
+SQLite database):
+
 ```bash
-npm install
+npm run setup
+```
+
+Then, every time you want to run the app:
+
+```bash
 npm run dev
 ```
 
-Then open the printed local URL. The first time the app loads, it seeds
-itself with realistic demo data (users, tickets, assets, knowledge base
-articles, etc.) automatically — no separate seed step required.
+This starts the Vite dev server (`http://localhost:5173`) *and* the API
+server (`http://localhost:4000`) together, with Vite proxying `/api` to the
+backend so there's nothing extra to configure. The first time the backend
+starts against an empty database it seeds itself with realistic demo data
+(users, tickets, assets, knowledge base articles, etc.) automatically — no
+separate seed step required.
+
+Prefer two terminals? `npm run dev:web` and `npm run dev:api` start each
+half on its own.
 
 ### Demo accounts
 
@@ -84,8 +79,7 @@ Google account is contacted).
 ### Resetting demo data
 
 Sign in as an admin and go to **System Settings > Danger Zone > Reset Demo
-Data**, or simply clear the `omnidesk_it_v1` key from your browser's
-localStorage and refresh.
+Data** — this wipes the SQLite database on the server and reseeds it.
 
 ## Feature overview
 
@@ -145,7 +139,8 @@ localStorage and refresh.
 
 ```
 src/
-  api/            localStorage-backed data layer (db.js, entities.js)
+  api/            frontend data layer — an in-memory cache in front of the
+                  real API (db.js, entities.js, authToken.js)
   components/     shared UI (Layout, badges, notification center, chatbot...)
     ui/           small hand-built UI kit (button, dialog, table, tabs...)
     ticket/       ticket-detail sub-components (conversation, history...)
@@ -153,39 +148,55 @@ src/
   lib/            auth context, constants, AI/automation logic, utils
   pages/          route-level screens
     admin/        admin-only screens (users, audit logs, settings)
-base44/entities/  reference copies of the original Base44 entity schemas
+server/           Express + Prisma + SQLite backend (see below)
 ```
 
-## Swapping in a real backend / integrations
+## Architecture
 
-This app was intentionally built with clean seams so each "fake" piece can
-be swapped for a real one without touching the rest of the app:
+**Backend** (`server/`) is a small Express API on top of a single Prisma/
+SQLite table (`Item: {id, collection, data}`) — every OmniDesk IT entity
+(tickets, users, assets, ...) is stored as one JSON document per row, keyed
+by collection name. This mirrors the flexible per-entity shape the app
+already used, so no rigid per-field schema was needed for 16 entity types.
+Key endpoints:
 
-- **Data storage**: replace the implementation inside `src/api/db.js`
-  (`makeCollection`) with real API calls — every page only ever imports
-  from `src/api/entities.js`, so no page code needs to change.
-- **Authentication / SSO**: `src/lib/AuthContext.jsx` centralizes
-  login/register/logout; swap in real SSO (Google/Microsoft OAuth, SAML) by
-  replacing `login`/`register` and the `/oauth-consent` page.
-- **AI**: replace the function bodies in `src/lib/ai.js` with calls to a
-  real LLM (e.g. the Claude API) — keep the same input/output shapes and
-  nothing else needs to change.
-- **Email / Microsoft Teams notifications**: hook into
-  `src/api/entities.js`'s `Notifications` collection (or add a new
-  `sendEmail`/`sendTeamsMessage` helper) at the same call sites that already
-  create in-app notifications.
+- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` —
+  bcrypt password hashing, JWT sessions.
+- `GET /api/bootstrap` — the entire dataset in one call (passwords always
+  stripped).
+- `POST/PATCH/DELETE /api/collections/:name[/:id]` — generic CRUD, requires
+  a valid JWT.
+- `POST /api/reset` — wipes and reseeds the database (used by Admin >
+  System Settings).
+
+**Frontend** (`src/api/db.js`) fetches the whole dataset once via
+`bootstrap()` into an in-memory cache. `list/filter/get/count` read that
+cache synchronously (so every existing page's code — which was written
+assuming synchronous local reads — kept working unchanged), while
+`create/update/delete/bulkCreate` update the cache immediately for a snappy
+UI and persist to the server in the background. If a background sync fails
+(e.g. the API is down), it's logged to the console rather than silently
+lost. Auth (`src/lib/AuthContext.jsx`) talks to the server directly, since
+passwords are never present in the cache.
+
+To swap in a different database later, only `server/prisma/schema.prisma`
+and `server/src/store.js` need to change — the routes, and the entire
+frontend, are unaffected.
 
 ## Building for production
 
 ```bash
-npm run build
-npm run preview
+npm run build   # frontend — outputs a static build in dist/
 ```
 
-The production build is fully static and can be hosted on any static file
-host (Vercel, Netlify, GitHub Pages, S3, etc.).
+The frontend build is static and can be hosted anywhere (Vercel, Netlify,
+S3, etc.); set `VITE_API_URL` at build time if the API isn't served from the
+same origin under `/api`. The backend (`server/`) is a normal long-running
+Node process — deploy it anywhere Node runs (a VM, Render, Railway, Fly.io,
+etc.) with a persistent disk for `server/prisma/dev.db`, or point
+`DATABASE_URL` at a hosted Postgres/MySQL instance and adjust the Prisma
+`provider` accordingly.
 
 ---
 
-Generated with the help of Claude. See `base44/entities/*.jsonc` for the
-original scraped Base44 schemas this rebuild was anchored to.
+Built with the help of Claude.

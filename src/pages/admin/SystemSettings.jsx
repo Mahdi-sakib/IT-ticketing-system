@@ -65,9 +65,9 @@ export default function SystemSettings() {
     toast.success(`Checked ${checked} open tickets — escalated ${escalated}.`);
   }
 
-  function handleReset() {
-    if (!confirm("This will erase all local demo data and reload the app. Continue?")) return;
-    resetDatabase();
+  async function handleReset() {
+    if (!confirm("This will erase all data on the server and reseed the demo dataset. Continue?")) return;
+    await resetDatabase();
     window.location.reload();
   }
 
