@@ -1,7 +1,7 @@
 // Heuristic "AI" layer (classification, summarization, routing, chatbot,
 // SLA escalation). No external LLM key required, so the app works fully
 // offline out of the box — see README.md for how to swap in a real model
-// (e.g. the Claude API) by replacing the body of these functions.
+// by replacing the body of these functions.
 import { Tickets, Users, Notifications, TicketHistory } from "@/api/entities";
 import { CATEGORIES, SUBCATEGORIES, PRIORITIES, slaState } from "@/lib/ticketConstants";
 

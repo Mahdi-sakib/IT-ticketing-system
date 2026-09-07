@@ -107,8 +107,8 @@ Data** — this wipes the SQLite database on the server and reseeds it.
 > **Note:** the "AI" here is a fast, fully offline, rule/heuristic
 > implementation — there is no external LLM call, so the app works with zero
 > API keys. Every AI function lives in `src/lib/ai.js` with a clear,
-> single-purpose signature, so swapping in a real model (e.g. the Claude
-> API) later is a matter of replacing each function's body — see the
+> single-purpose signature, so swapping in a real LLM later is a matter of
+> replacing each function's body — see the
 > comments at the top of that file.
 
 **ITSM modules**
@@ -197,6 +197,3 @@ etc.) with a persistent disk for `server/prisma/dev.db`, or point
 `DATABASE_URL` at a hosted Postgres/MySQL instance and adjust the Prisma
 `provider` accordingly.
 
----
-
-Built with the help of Claude.
